@@ -1,14 +1,14 @@
-# wasm/
+# toolset/
 
-The programs the wasm shell (`kernel-zig/src/shell.zig`) runs: brush + uutils
+The sources of the programs the wasm shell (skein's `kernel-zig/src/shell.zig`) runs: brush + uutils
 coreutils, the toolset of issue #13 (search/edit/structured-data
-commands beyond coreutils, registered in `tool_names`, kernel-zig/src/programs.zig), git (issue
+commands beyond coreutils, registered in `tool_names`, skein's kernel-zig/src/programs.zig), git (issue
 #2, also in `tool_names`), and the script runtimes of issue #25
 (`qjs`/`node`, `python`/`python3`; see "Script runtimes" below). All WASI
 preview1 modules (`wasm32-wasip1`), built with Rust 1.98.1 (git and qjs: C,
 wasi-sdk 34; python: a pinned upstream build) and stripped of symbols.
-`scripts/build-wasm.sh` rebuilds all of them from the pinned sources plus
-`patches/`, byte-identically on the same machine in the same checkout
+`scripts/build-toolset.sh` rebuilds all of them into `out/` from the pinned
+sources plus `patches/`, byte-identically on the same machine in the same checkout
 layout (paths of the build machine and even line numbers within a patched
 file appear in panic-location strings baked into the binary, so a
 different machine, or a differently-named `.build/` checkout dir, gets
@@ -27,8 +27,8 @@ other bytes — verified the hard way while pinning `sed.wasm`, see the
 | `sed.wasm`       | 2.04 MB | uutils/sed `0.2.0` (`2ce633cb`), + `patches/sed.patch` |
 | `awk.wasm`       | 1.54 MB | quinnjr/rawk (crate `awk-rs`) `v0.2.0` (`4addaefa`), unpatched |
 | `tree.wasm`      | 0.69 MB | peteretelej/tree (crate `rust_tree`) `v1.3.0` (`dfed2820`), unpatched |
-| `which.wasm`     | 0.07 MB | first-party, `wasm/tools/which` — no Rust `which` CLI exists (library only) |
-| `grep.wasm`      | 1.57 MB | first-party, `wasm/tools/grep` on grep-matcher/grep-regex/grep-searcher (ripgrep's own libraries) — no GNU-grep-compatible CLI exists in Rust |
+| `which.wasm`     | 0.07 MB | first-party, `toolset/tools/which` — no Rust `which` CLI exists (library only) |
+| `grep.wasm`      | 1.57 MB | first-party, `toolset/tools/grep` on grep-matcher/grep-regex/grep-searcher (ripgrep's own libraries) — no GNU-grep-compatible CLI exists in Rust |
 | `git.wasm`       | 3.78 MB | git `2.55.0` (C, kernel.org release tarball) + zlib `1.3.2`, wasi-sdk 34, + `patches/git.patch` and `git/` (see "git" below) |
 | `qjs.wasm`       | 1.20 MB | quickjs-ng/quickjs `v0.17.0` (`6d46d07d`), wasi-sdk 34.0, + `patches/quickjs.patch` + `tools/qjs/`; registered as `qjs` and `node` (issue #25) |
 | `python.wasm`    | 7.63 MB | CPython 3.14.7 WASI build, brettcannon/cpython-wasi-build `v3.14.7` (`python-3.14.7-wasi_sdk-24.zip`, sha256 `2e064d3f…584b`), `llvm-strip`ped (30.5 MB with DWARF); registered as `python` and `python3` (issue #25) |
@@ -160,7 +160,7 @@ projects); see "not attempted" below for `file`. Missing and built here:
   nothing — WASI has no termios/ioctl, so there is no real terminal to
   back a REPL either way, same as the skein shell itself.
 - **which** — no Rust `which` CLI exists on crates.io, only a library
-  (`which`). First-party, `wasm/tools/which` (~50 lines): checks `$PATH`
+  (`which`). First-party, `toolset/tools/which` (~50 lines): checks `$PATH`
   entries as files first (`std::env::split_paths` is unimplemented under
   wasm32-wasip1 — "unsupported" panic — so `PATH` is split on `:` by
   hand), then falls back to the host's `skein.cmd_exists` import (the
@@ -171,7 +171,7 @@ projects); see "not attempted" below for `file`. Missing and built here:
 - **grep** — no GNU-grep-flag-compatible CLI exists in Rust (ripgrep is
   the closest but explicitly disclaims GNU/POSIX flag compatibility:
   different defaults, no `-E`, always-recursive). First-party,
-  `wasm/tools/grep`, built directly on the libraries ripgrep itself is
+  `toolset/tools/grep`, built directly on the libraries ripgrep itself is
   built from (`grep-matcher`, `grep-regex`, `grep-searcher`, all pure
   Rust). Covers `-r -R -n -i -E -l -v -c -H -h -o -e`, multiple files,
   stdin, and a plain single-threaded deterministic recursive walk (no
@@ -213,7 +213,7 @@ findutils' `onig` dependency (Oniguruma, the regex engine behind `-regex`/
 `-iregex`/`-name`) is a C library compiled via the `cc`/`onig_sys` build
 script; the Rust `wasm32-wasip1` target's bundled wasi-libc is not a C
 *compiler*, so `cc` has nothing to compile C with and fails
-(`fatal error: 'stdlib.h' file not found`). `scripts/build-wasm.sh` fetches
+(`fatal error: 'stdlib.h' file not found`). `scripts/build-toolset.sh` fetches
 [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) 34.0 into
 `.build/wasi-sdk/` (once; ~190 MB, cached after) and points `CC_wasm32_wasip1`/
 `CFLAGS_wasm32_wasip1` at its clang + sysroot, only for the findutils step.
@@ -250,7 +250,7 @@ for `wasm32-wasip1` with wasi-sdk 34's clang: one binary with every builtin
 (no dashed commands, no scripts). gitoxide was not needed. Its
 `.git/objects` is the Zig kernel's synthetic object directory (docs/VM.md,
 "The synthetic object directory"): loose objects are the store's git-raw
-records, nothing is stored twice. `scripts/build-wasm.sh` fetches the git
+records, nothing is stored twice. `scripts/build-toolset.sh` fetches the git
 and zlib release tarballs (checked by sha256), applies `patches/git.patch`,
 copies `git/config.mak` in and builds. The result is byte-identical to the
 committed file, also from a differently-named build directory
@@ -402,7 +402,7 @@ SHA-256 of the release zip, then stripped of DWARF (30.5 → 7.6 MB).
 Building CPython ourselves would add a CPython checkout, its `Tools/wasm`
 driver and a native build Python for no functional gain today.
 
-The stdlib is `wasm/python314.zip`: `lib/python3.14` of the same release,
+The stdlib is skein's `wasm/python314.zip`: `lib/python3.14` of the same release,
 every `.py` file, packed **stored** (the build has no `zlib`, so
 `zipimport` could not inflate) with fixed timestamps, sorted. It is a raw
 block like the modules (`FILES` in `src/runtime/programs.ts`,
@@ -437,17 +437,12 @@ leaves out `test`, `idlelib`, `tkinter`, `ensurepip`); add `.pyc` (faster import
 doubles the zip) or ship `.pyc` only (no source in tracebacks); or build
 CPython ourselves with zlib and a deflated zip (~2.4 MB).
 
-## The stock programs
+## Where the modules live
 
-Beside the shell's programs, `wasm/` holds the stock programs a genesis
-installs: the handlers (`run-handler`, `objects-handler`, `head-handler`,
-`subscribe-handler`), the turn loop (`loop`), `messagebox`, `frontdoor`,
-`resolve`, the `wallet`, and `wire-probe` (a test program, not in a
-genesis). All Zig 0.16.0, `wasm32-wasi` (since #54 the handlers and the
-loop too; they were Go `wasip1`, 3.7–5.6 MB each, now 73–246 KB), built by
-`scripts/build-programs.sh` from `programs/` and `wallet-zig/` and pinned by
-`scripts/pin-programs.sh` in `kernel-zig/src/programs.zig`. `wasm/v1/` keeps
-the frozen TS runtime's Go builds of the handlers, pinned in
-`src/runtime/programs.ts`, never rebuilt. Go `wasip1` (or Rust, C, …) stays
-a valid target for third-party programs: the `skein` imports are the ABI
-(`wit/skein.wit`), not a language.
+The built modules are committed and pinned in skein, not here: skein's
+`wasm/*.wasm` (and `wasm/python314.zip`), pinned by raw CID in
+`kernel-zig/src/programs.zig` and `src/runtime/programs.ts`, because the
+kernel's stock shell program and every stock genesis name them. A rebuild
+here (`scripts/build-toolset.sh` → `out/`) is moved into skein with skein's
+`scripts/update-workbench.sh <this checkout>`, which copies the modules and
+rewrites the pins.

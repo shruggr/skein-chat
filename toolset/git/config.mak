@@ -1,5 +1,5 @@
 # skein: git for wasm32-wasip1 (wasi-sdk). Copied into the source tree as
-# config.mak by scripts/build-wasm.sh, which sets SKEIN_WASI_SDK, SKEIN_ZLIB
+# config.mak by scripts/build-toolset.sh, which sets SKEIN_WASI_SDK, SKEIN_ZLIB
 # and SKEIN_COMPAT (this directory). See wasm/README.md, "git".
 CC = $(SKEIN_WASI_SDK)/bin/clang --target=wasm32-wasip1 --sysroot=$(SKEIN_WASI_SDK)/share/wasi-sysroot
 AR = $(SKEIN_WASI_SDK)/bin/llvm-ar

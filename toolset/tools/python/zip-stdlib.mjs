@@ -2,7 +2,7 @@
 // imports it from: every .py file (no __pycache__), sorted, ZIP_STORED — the
 // WASI build has no zlib, so zipimport cannot inflate — with fixed
 // timestamps and modes, so the same input gives the same bytes.
-// Run by scripts/build-wasm.sh: node wasm/tools/python/zip-stdlib.mjs <libdir> <out.zip>
+// Run by scripts/build-toolset.sh: node toolset/tools/python/zip-stdlib.mjs <libdir> <out.zip>
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { crc32 } from "node:zlib";

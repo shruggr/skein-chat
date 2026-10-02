@@ -1,12 +1,12 @@
 .{
     .name = .skein_workbench,
-    .version = "0.1.0",
+    .version = "0.2.0",
     .minimum_zig_version = "0.16.0",
     .fingerprint = 0xcbba6e71f0e93324,
     .dependencies = .{
         .skein_sdk = .{
-            .url = "git+https://github.com/shruggr/skein-sdk#22e69743029da1524e1116e1931e33204a0d515c",
-            .hash = "skein_sdk-0.1.0-YroFBFSbFwB1DSgkpnE_3gjUrfY1oxZQzIBbv5umt96K",
+            .url = "https://github.com/shruggr/skein-sdk/archive/refs/tags/v0.4.0.tar.gz",
+            .hash = "skein_sdk-0.4.0-YroFBDfGGADreMJWF41zqUyuS71zsF4uG8GNoPswWhek",
         },
     },
     .paths = .{

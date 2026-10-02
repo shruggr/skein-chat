@@ -1,39 +1,65 @@
 {
   "kind": "app",
   "name": "workbench",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "programs": {
     "run": "bin/run-handler.wasm",
     "loop": "bin/loop.wasm",
-    "objects": "bin/objects-handler.cid",
-    "head": "bin/head-handler.cid",
-    "subscribe": "bin/subscribe-handler.cid",
     "shell": "shell"
-  },
-  "handler": {
-    "run": "run",
-    "chat": "loop",
-    "objects": "objects",
-    "head": "head",
-    "subscribe": "subscribe"
   },
   "provides": [
     {
       "interface": "workbench.run/1",
       "functions": {
-        "run": {"writes": true, "args": {"cmd": "string", "tree?": "cid", "cwd?": "string", "env?": "map"}, "answer": {"exitCode": "int", "stdout": "string", "stderr": "string", "tree": "cid"}}
+        "run": {
+          "writes": true,
+          "args": {
+            "cmd": "string",
+            "tree?": "cid",
+            "cwd?": "string",
+            "env?": "map"
+          },
+          "answer": {
+            "exitCode": "int",
+            "stdout": "string",
+            "stderr": "string",
+            "tree": "cid"
+          }
+        }
       }
     },
     {
       "interface": "workbench.chat/1",
       "functions": {
-        "chat": {"writes": true, "args": {"text": "string", "tree?": "cid", "model?": "string", "replyTo?": "cid"}, "answer": {"text": "string", "tree": "cid", "thread": "cid"}}
+        "chat": {
+          "writes": true,
+          "args": {
+            "text": "string",
+            "tree?": "cid",
+            "model?": "string",
+            "replyTo?": "cid"
+          },
+          "answer": {
+            "text": "string",
+            "tree": "cid",
+            "thread": "cid"
+          }
+        }
       }
     }
   ],
   "requires": [],
-  "boxes": ["run", "chat", "objects", "head", "subscribe"],
-  "routes": [],
-  "heads": ["main"],
-  "description": "The agent workbench: `run` (a bash command in the wasm shell over a tree, the answer in the sender's `results` box) and `chat` (the turn loop: the `infer` peer, `bash` and `message` tool calls, answers in `chat`), over the install boxes `objects`, `head` and `subscribe`. `shell` is the kernel's stock shell program: its modules (brush, coreutils and the toolset) are built from toolset/ and pinned in skein. objects/head/subscribe are skein's stock boundary programs, named by CID."
+  "dispatch": [
+    {
+      "address": "run",
+      "sender": "$owner",
+      "program": "run"
+    },
+    {
+      "address": "chat",
+      "sender": "$owner",
+      "program": "loop"
+    }
+  ],
+  "description": "The agent workbench: `run` (a bash command in the wasm shell over a tree, the answer in the sender's `results` box) and `chat` (the turn loop: the `infer` peer, `bash` and `message` tool calls, answers in `chat`), each from the owner. `shell` is the kernel's stock shell program: its modules (brush, coreutils and the toolset) are built from toolset/ and pinned in skein. The install boxes (objects, head, dispatch, peers) are the kernel's own operations since skein #77, not this app's."
 }

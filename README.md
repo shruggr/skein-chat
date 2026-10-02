@@ -10,7 +10,6 @@ sources under `wasm/` (now `toolset/`).
 |---|---|---|
 | `run` | `run-handler` | `{cmd, tree?, cwd?, env?}`: runs a bash command in the wasm shell over a tree (no tree: `main`'s), and replies in the sender's `results` box with `{exitCode, stdout, stderr, tree, replyTo}` |
 | `chat` | `loop` | the turn loop. Its prompt comes from the tree's `SOUL.md`. It asks the `infer` peer, runs `bash` tool calls in the shell and `message` tool calls as a `chat` to another party, and answers the opener with a `chat` reply |
-| `objects`, `head`, `subscribe` | skein's stock handlers, by CID | the install boxes. They are skein's boundary programs and stay in skein |
 
 The shell is the kernel's stock shell program. It is brush and coreutils plus
 the toolset: find, xargs, diff, cmp, jq, which, grep, tree, awk, sed, git,
@@ -22,7 +21,6 @@ qjs/node and python/python3. Its sources and build are here (`toolset/`,
 ```
 bin/run-handler.wasm        the run handler (wasm32-wasi, committed; `zig build bin` rewrites it)
 bin/loop.wasm               the turn loop (likewise)
-bin/{objects,head,subscribe}-handler.cid   skein's stock install handlers, by raw CID
 etc/app.json                the manifest (skein docs/APPS.md §2)
 programs/run-handler/, programs/loop/   their sources (Zig 0.16.0, over shruggr/skein-sdk)
 toolset/                    the shell's modules: patches, first-party tools (which, grep, the qjs prelude), the git compat layer
@@ -32,7 +30,7 @@ scripts/build-toolset.sh    builds the toolset into out/
 ## What stays pinned in skein, and why
 
 Every stock genesis wires `run` to `run-handler` and `chat` to `loop`
-(skein `src/host/genesis.ts`, `STOCK_SUBSCRIPTIONS`). The kernel builds the
+(skein `src/host/genesis.ts`, `STOCK_DISPATCH`). The kernel builds the
 stock `shell` program record from its pinned modules. So skein keeps the
 **built modules** of this app: `wasm/run-handler.wasm`, `wasm/loop.wasm`,
 and the toolset (`wasm/brush.wasm` … `wasm/python314.zip`). They are
@@ -50,9 +48,14 @@ modules skein pinned before the split
 build is reproducible on the same machine in the same checkout layout only
 (`toolset/README.md`).
 
-The manifest's `handler` is a map from box to program, because the
-workbench serves several boxes. docs/APPS.md §2 has one `handler` for an
-app's one box. The map form is a proposal for #72.
+The manifest is the #77 shape (0.2.0, skein #79): two dispatch rows, `run`
+and `chat` from the owner, each to its program. The install boxes of 0.1.0
+(`objects`, `head`, `subscribe`, skein's handler programs by CID) are gone:
+since skein #77 those are the kernel's own operations, not programs. A stock
+genesis still wires `run` and `chat` itself (skein `STOCK_DISPATCH`), so
+installing this app into a stock instance clashes on those rows — whether
+the stock genesis drops them so the workbench installs as an app is an open
+question in skein #31.
 
 ## Build and test
 

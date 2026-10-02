@@ -442,7 +442,7 @@ CPython ourselves with zlib and a deflated zip (~2.4 MB).
 The built modules are committed and pinned in skein, not here: skein's
 `wasm/*.wasm` (and `wasm/python314.zip`), pinned by raw CID in
 `kernel-zig/src/programs.zig` and `src/runtime/programs.ts`, because the
-kernel's stock shell program and every stock genesis name them. A rebuild
+kernel's shell program record and skein's default genesis name them. A rebuild
 here (`scripts/build-toolset.sh` → `out/`) is moved into skein with skein's
 `scripts/update-workbench.sh <this checkout>`, which copies the modules and
 rewrites the pins.

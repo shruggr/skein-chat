@@ -55,10 +55,13 @@
 //!
 //! Tools: `bash` (a command in the shell over the working tree) and `message`
 //! ({to: "@handle@domain", text}: a `chat` to another party — the identity
-//! the address book names for the handle, or, on first contact, the one the
-//! resolve program finds: launched as a thread (#67), this step waits on it
-//! and the call runs again when it finishes — emitted (#70), then rest on
-//! the reply as on an `infer`; their reply is the tool result).
+//! the address book names for the handle, else the one the resolve program
+//! has recorded (`resolve/peers`, skein#87), or, on first contact, the one it
+//! finds: launched as a thread (#67), this step waits on it and the call runs
+//! again when it finishes — emitted (#70), then rest on the reply as on an
+//! `infer`; their reply is the tool result). The resolve program never
+//! writes the address book (skein#87): the messagebox's delivery reads its
+//! record for a key the address book does not name.
 //! Calls run one at a time, in order. With `defaults.tools` in the genesis
 //! naming them (a comma-separated list; default none), three more: `say`
 //! ({text}), `present` ({page, blocks?}) and `annotate` ({present, block?,
@@ -96,8 +99,8 @@
 //!                                                as an inference error; the answer → an error
 //!                                                turn, and the thread ends
 //!
-//! Sending is an `emit` (#70): a recipient not in the address book fails at
-//! once (as undelivered); delivery, and its retries of transient failures
+//! Sending is an `emit` (#70): a recipient neither in the address book nor
+//! resolved fails (as undelivered); delivery, and its retries of transient failures
 //! (`defaults.sendRetryMs`, `defaults.sendAttempts`), are the messagebox's
 //! delivery thread's, which tells this thread `undelivered` if it gives up.
 //!
@@ -584,7 +587,7 @@ const Loop = struct {
     /// (error.Awaiting); or why it could not be sent.
     fn deliver(l: *Loop, ma: MessageArgs) ![]const u8 {
         const a = l.a;
-        const key = (try sk.peerByHandle(a, ma.handle, ma.domain)) orelse {
+        const key = (try sk.peerByHandle(a, ma.handle, ma.domain)) orelse (try resolvedHandleKey(a, ma.handle, ma.domain)) orelse {
             if (l.resolveFailed) |why| return why;
             _ = sk.launchResolve(a, l.in, ma.handle, ma.domain, null) catch |e| {
                 if (e == error.OutOfMemory) return e;
@@ -639,7 +642,7 @@ const Loop = struct {
     }
 
     /// resolvedHandle: the resolve thread a `message` (or the `infer`) waited
-    /// on came to rest: the call runs again — the address book now names the
+    /// on came to rest: the call runs again — the resolve program's records now name the
     /// handle, or, the resolve having failed, the call fails with its error.
     fn resolvedHandle(l: *Loop, res: Value) !void {
         if (!eql(u8, Value.str(res.get("state")) orelse "", "finished")) {
@@ -762,7 +765,7 @@ const Loop = struct {
             }
         };
         // Not in the address book, with a name for it: resolve it first (a thread; infer runs again after).
-        if (handle.len > 0 and l.resolveFailed == null and (try sk.peerOf(a, peer)) == null) {
+        if (handle.len > 0 and l.resolveFailed == null and (try sk.peerOf(a, peer)) == null and (try resolutionOf(a, peer)) == null) {
             _ = sk.launchResolve(a, l.in, handle, domain, peer) catch |e| {
                 if (e == error.OutOfMemory) return e;
                 const msg = try std.fmt.allocPrint(a, "could not deliver to the inference peer: {s}", .{sk.errorText(e)});
@@ -1047,6 +1050,39 @@ fn start(a: Allocator) !void {
         return l.toolDone(resolved[0]);
     }
     return l.chat(l.message, try sk.linkField(args, "body"));
+}
+
+/// The resolve program's records (skein#87): head `resolve/peers`, {kind:
+/// "resolutions", peers: [{key, peer: <cid>}]}, each {kind: "resolution",
+/// key, transport, address, handle, domain, since, source}. What a BRC-169
+/// lookup found, kept under the resolve program's own name; the address book
+/// is the owner's.
+const RESOLUTIONS = "resolve/peers";
+
+fn resolutions(a: Allocator) ![]const Value {
+    const root = (try sk.head(a, RESOLUTIONS)) orelse return &.{};
+    const r = try sk.get(a, root);
+    const list = r.get("peers") orelse return &.{};
+    if (list != .array) return &.{};
+    const out = try a.alloc(Value, list.array.len);
+    for (list.array, out) |x, *o| o.* = try sk.get(a, Value.cidOf(x.get("peer")) orelse return sk.report("resolve/peers: an entry names no record"));
+    return out;
+}
+
+/// The resolve program's record of `key`, or null.
+fn resolutionOf(a: Allocator, key: []const u8) !?Value {
+    for (try resolutions(a)) |p| if (eql(u8, Value.bytesOf(p.get("key")) orelse "", key)) return p;
+    return null;
+}
+
+/// The key the resolve program recorded for a BRC-169 handle, or null.
+fn resolvedHandleKey(a: Allocator, handle: []const u8, domain: []const u8) !?[]const u8 {
+    for (try resolutions(a)) |p| {
+        if (eql(u8, Value.str(p.get("handle")) orelse "", handle) and eql(u8, Value.str(p.get("domain")) orelse "", domain)) {
+            if (Value.bytesOf(p.get("key"))) |k| if (sk.isKey(k)) return k;
+        }
+    }
+    return null;
 }
 
 /// Whether a resolved thread runs the genesis's resolve program.

@@ -1,19 +1,17 @@
-// skein-workbench (split out of skein by #71): the agent workbench as a skein
-// app — the `run` handler (a bash command in the wasm shell over a tree) and
-// the chat turn loop (#54), Zig 0.16.0, wasm32-wasi, over the SDK
-// (skein-sdk: `cbor`, `sk`, `brc104`). The shell's toolset (brush, coreutils,
-// git, jq, python, qjs, …) is built by scripts/build-toolset.sh, not here.
+// skein-chat (shruggr/skein#83): the chat app — the turn loop (#54) that
+// asks an inference peer, keeps each turn, and runs `bash` (in the shell
+// app's shell, when the instance has it) and `message` tool calls. Zig
+// 0.16.0, wasm32-wasi, over the SDK (skein-sdk: `cbor`, `sk`).
 //
-//   zig build        → zig-out/bin/run-handler.wasm, zig-out/bin/loop.wasm
-//   zig build bin    the same, written to bin/ (the app tree's modules; committed)
-//   zig build test   the loop's tests (natively), and both programs built
+//   zig build        → zig-out/bin/loop.wasm
+//   zig build bin    the same, written to bin/ (the app tree's module; committed)
+//   zig build test   the loop's tests (natively), and the program built
 //
-// The builds are reproducible: bin/*.wasm are byte for byte the modules skein
-// pins for `run-handler` and `loop` (kernel-zig/src/programs.zig).
+// The build is reproducible: bin/loop.wasm is byte for byte what
+// `zig build bin` writes from this tree.
 const std = @import("std");
 
 const programs = [_]struct { name: []const u8, root: []const u8 }{
-    .{ .name = "run-handler", .root = "programs/run-handler/main.zig" },
     .{ .name = "loop", .root = "programs/loop/main.zig" },
 };
 
@@ -25,9 +23,9 @@ pub fn build(b: *std.Build) void {
         b.installArtifact(exe);
         bin.addCopyFileToSource(exe.getEmittedBin(), b.fmt("bin/{s}.wasm", .{p.name}));
     }
-    b.step("bin", "write the modules into the app tree: bin/run-handler.wasm, bin/loop.wasm").dependOn(&bin.step);
+    b.step("bin", "write the module into the app tree: bin/loop.wasm").dependOn(&bin.step);
 
-    const test_step = b.step("test", "the loop's tests, natively; both programs built");
+    const test_step = b.step("test", "the loop's tests, natively; the program built");
     test_step.dependOn(b.getInstallStep());
     const native = b.standardTargetOptions(.{});
     const gojson = b.addTest(.{ .root_module = module(b, "programs/loop/gojson.zig", native, .Debug, false) });
@@ -44,7 +42,6 @@ fn module(b: *std.Build, root: []const u8, t: std.Build.ResolvedTarget, o: std.b
         .imports = &.{
             .{ .name = "cbor", .module = sdk.module("cbor") },
             .{ .name = "sk", .module = sdk.module("sk") },
-            .{ .name = "brc104", .module = sdk.module("brc104") },
         },
     });
 }

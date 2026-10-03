@@ -1,5 +1,5 @@
 //! loop: the turn loop (README.md, "Records"; docs/MESSAGES.md), launched by a
-//! subscription (…, chat) → loop with the opening `chat` message as its input:
+//! dispatch row (…, chat) → loop with the opening `chat` message as its input:
 //! David's, or another agent's (the `message` tool of another instance). Its
 //! sender is the thread's opener.
 //!
@@ -53,7 +53,9 @@
 //! conversation (no replyTo). A conversation is pairwise; two agents talking
 //! alternate on one thread each.
 //!
-//! Tools: `bash` (a command in the shell over the working tree) and `message`
+//! Tools: `bash` (a command in the shell over the working tree: the shell
+//! app's shell program, found at its head `shell/app` — skein#83: the shell
+//! is another app; without it a bash call's result is exit 127 and says so) and `message`
 //! ({to: "@handle@domain", text}: a `chat` to another party — the identity
 //! the address book names for the handle, else the one the resolve program
 //! has recorded (`resolve/peers`, skein#87), or, on first contact, the one it
@@ -144,6 +146,24 @@ const present_tool =
 const annotate_tool =
     \\{"type":"function","function":{"name":"annotate","description":"Add a note to a page presented in this conversation, on one of its blocks.","parameters":{"type":"object","properties":{"present":{"type":"string","description":"the page's CID, as `present` returned it"},"block":{"type":"string","description":"the block's id"},"note":{"type":"string","description":"the note"}},"required":["present","note"]}}}
 ;
+
+/// The shell app's name (shruggr/skein#83): its root head `shell/app`.
+const SHELL_APP = "shell/app";
+
+/// A bash call's result when the instance has no shell app.
+const no_shell = "bash: no shell here: the shell app is not installed (no head shell/app)";
+
+/// The shell program the `bash` tool runs: the shell app's (the app record at
+/// its head `shell/app`, its `programs.shell`), or null when the shell app is
+/// not installed. Read at each call: installing the shell app later gives
+/// the next call a shell.
+fn shellProgram(a: Allocator) !?[]const u8 {
+    const root = (try sk.head(a, SHELL_APP)) orelse return null;
+    const m = try sk.get(a, root);
+    if (!eql(u8, Value.str(m.get("kind")) orelse "", "app")) return null;
+    const ps = m.get("programs") orelse return null;
+    return Value.cidOf(ps.get("shell"));
+}
 
 /// The optional tools (issue #19), offered in this order when defaults.tools names them.
 const optional_tools = [_][2][]const u8{ .{ "say", say_tool }, .{ "present", present_tool }, .{ "annotate", annotate_tool } };
@@ -571,7 +591,11 @@ const Loop = struct {
             }
             const d = try gojson.decode(a, call.arguments, &.{.{ .name = "cmd" }}, "struct { Cmd string \"json:\\\"cmd\\\"\" }");
             const cmd = d.got[0].text;
-            if (eql(u8, call.name, "bash") and d.err == null and cmd.len > 0) return l.launch(cmd);
+            if (eql(u8, call.name, "bash") and d.err == null and cmd.len > 0) {
+                if (try shellProgram(a)) |shell| return l.launch(shell, cmd);
+                try l.result(call, .{ .of = l.entry, .exit_code = 127, .stdout = "", .stderr = no_shell, .tree = l.workTree() });
+                continue;
+            }
             const msg = if (eql(u8, call.name, "bash")) "bash wants {\"cmd\": string}" else try std.fmt.allocPrint(a, "unknown tool {s}", .{call.name});
             try l.result(call, .{ .of = l.entry, .exit_code = 2, .stdout = "", .stderr = msg, .tree = l.workTree() });
         }
@@ -692,7 +716,7 @@ const Loop = struct {
         return l.next();
     }
 
-    fn launch(l: *Loop, cmd: []const u8) !void {
+    fn launch(l: *Loop, shell: []const u8, cmd: []const u8) !void {
         const a = l.a;
         const tree = l.workTree();
         if (eql(u8, tree, &sk.empty_tree)) try sk.putEmptyTree();
@@ -700,7 +724,6 @@ const Loop = struct {
         try m.put("cmd", cbor.string(cmd));
         try m.put("tree", cbor.cidv(tree));
         const ac = try sk.put(a, m.value());
-        const shell = sk.program(l.in, "shell") orelse return sk.report("no shell program");
         _ = try sk.launch(a, shell, ac);
     }
 

@@ -1,50 +1,37 @@
-# skein-workbench
+# skein-chat
 
-The shell and the chat loop for a [skein](https://github.com/shruggr/skein),
-as one app: `run` runs a bash command in the WASI shell over a tree, and
-`chat` is the turn loop that asks an inference peer and runs tool calls.
-It also holds the sources of the shell's toolset. Version **0.2.0**. It is
-to be split into two apps, the shell app and the chat app
-(shruggr/skein#83), and archived once both are tagged.
+The chat app for a [skein](https://github.com/shruggr/skein): `chat` is the
+turn loop that asks an inference peer, keeps every turn, and runs the
+model's tool calls. Version **0.1.0**. A skein has no chat loop of its own:
+an instance chats once this app is installed (shruggr/skein#83).
 
 ## What it is
 
 | box | program | what |
 |---|---|---|
-| `run` | `run-handler` | `{cmd, tree?, cwd?, env?}`: a bash command in the shell over a tree (no tree: `main`'s); replies in the sender's `results` box with `{exitCode, stdout, stderr, tree, replyTo}` |
-| `chat` | `loop` | the turn loop: its prompt from the tree's `SOUL.md`; asks the `infer` peer; runs `bash` tool calls in the shell and `message` tool calls as a `chat` to another party; answers the opener with a `chat` reply |
+| `chat` | `loop` | the turn loop: its prompt from the tree's `SOUL.md`; asks the `infer` peer; runs `bash` tool calls in the shell and `message` tool calls as a `chat` to another party; answers the opener with a `chat` reply. From the owner, and from anyone (another agent's `message`) |
 
-The shell is the kernel's `shell` program record, built from pinned
-modules: brush and coreutils plus find, xargs, diff, cmp, jq, which, grep,
-tree, awk, sed, git, qjs (also `node`) and python (also `python3`). Their
-sources, patches and build are here (`toolset/`, `scripts/build-toolset.sh`,
-`toolset/README.md`).
+`bash` runs in the shell app's shell (shruggr/skein-shell): the loop reads
+the app record at the head `shell/app` and launches its `shell` program.
+This app requires nothing: on an instance without the shell app a `bash`
+call's result is exit 127, "the shell app is not installed", and the
+conversation goes on. An agent's skein can have the chat loop and no shell.
 
 | file | what |
 |---|---|
-| `bin/run-handler.wasm`, `bin/loop.wasm` | the two programs (wasm32-wasi, committed; `zig build bin` rewrites them) |
+| `bin/loop.wasm` | the loop (Zig, wasm32-wasi, committed; `zig build bin` rewrites it) |
 | `etc/app.json` | the manifest |
-| `programs/run-handler/`, `programs/loop/` | their sources (Zig) |
-| `toolset/`, `scripts/build-toolset.sh` | the shell's modules |
+| `programs/loop/` | its source |
 
-## Use it
-
-Today skein's default genesis wires `run` → `run-handler` and `chat` →
-`loop` itself, from modules skein pins (`wasm/run-handler.wasm`,
-`wasm/loop.wasm` and the toolset, pinned by raw CID in
-`kernel-zig/src/programs.zig`). So an instance has them without installing
-anything, and installing this app into such an instance is refused: its
-rows clash with the genesis's. shruggr/skein#83 removes them from the
-genesis; after that the shell and the chat app are installed like any app:
+## Install it
 
 ```
-skein-host install https://github.com/shruggr/skein-workbench --instance <handle>
+skein-host install https://github.com/shruggr/skein-chat --instance <handle>
 ```
 
 From the client (`bin/skein` in skein):
 
 ```
-bin/skein run --tree <cid> -- 'ls | head -3'
 bin/skein chat --new --wait 'what is here?'
 ```
 
@@ -53,71 +40,60 @@ The manifest, `etc/app.json` (description left out):
 ```json
 {
   "kind": "app",
-  "name": "workbench",
-  "version": "0.2.0",
-  "programs": { "run": "bin/run-handler.wasm", "loop": "bin/loop.wasm", "shell": "shell" },
+  "name": "chat",
+  "version": "0.1.0",
+  "programs": { "loop": "bin/loop.wasm" },
   "provides": [
-    { "interface": "workbench.run/1", "functions": { "run": { "writes": true,
-      "args": { "cmd": "string", "tree?": "cid", "cwd?": "string", "env?": "map" },
-      "answer": { "exitCode": "int", "stdout": "string", "stderr": "string", "tree": "cid" } } } },
-    { "interface": "workbench.chat/1", "functions": { "chat": { "writes": true,
+    { "interface": "chat/1", "functions": { "chat": { "writes": true,
       "args": { "text": "string", "tree?": "cid", "model?": "string", "replyTo?": "cid" },
       "answer": { "text": "string", "tree": "cid", "thread": "cid" } } } }
   ],
   "requires": [],
   "dispatch": [
-    { "address": "run", "sender": "$owner", "program": "run" },
-    { "address": "chat", "sender": "$owner", "program": "loop" }
+    { "address": "chat", "sender": "$owner", "program": "loop" },
+    { "address": "chat", "sender": "*", "program": "loop" }
   ]
 }
 ```
 
-`"shell": "shell"` names a program the instance already has by that name
-(the kernel's shell record). Rows default to transport `mailbox`; both are
-from the owner only.
+The open row (`*`) lets other agents start a conversation; an owner who
+wants chats from the owner only removes it (`skein-host dispatch <handle>
+remove chat <loop>`) and keeps the owner's row.
 
 ## Build and test
 
 Zig 0.16.0 (`mise.toml`).
 
 ```
-zig build                  # zig-out/bin/run-handler.wasm, zig-out/bin/loop.wasm
-zig build bin              # the same, into bin/ (reproducible)
-zig build test             # the loop's tests (natively); both programs built
-scripts/build-toolset.sh   # the shell's modules into out/ (needs rustup with wasm32-wasip1, curl, unzip, node; fetches wasi-sdk 34)
+zig build         # zig-out/bin/loop.wasm
+zig build bin     # the same, into bin/ (reproducible)
+zig build test    # the loop's tests (natively); the program built
 ```
 
-A change moves into skein with skein's `scripts/update-workbench.sh <this
-checkout>`: it copies `bin/*.wasm` (and `out/*` after a toolset build),
-rewrites the pins, and records this repo's commit in skein's
-`wasm/WORKBENCH`. The Zig builds are reproducible; the toolset build is
-reproducible on the same machine in the same checkout layout only
-(`toolset/README.md`).
-
-The behaviour is tested in skein, where the kernel runs these modules: the
-shell cases (`kernel-zig/equiv/shell.ts`), git in the VM (`equiv/git.ts`),
-`run` and `chat` through the host (`equiv/corpus.ts`, `boot.ts`,
-`serve.ts`) and the npm suite.
+The behaviour is tested in skein: `chat` through the host
+(`kernel-zig/equiv/corpus.ts`, `boot.ts`, `serve.ts`, `browser-live.ts`)
+and the npm suite (`src/host/loop.test.ts`). skein's tests install this
+app at the commit pinned in its `src/testapps.ts` (or `$SKEIN_CHAT_DIR`, a
+checkout).
 
 ## Docs
 
 | what | where |
 |---|---|
-| the toolset: each module's source and patches | `toolset/README.md` |
-| the shell in the VM, the clock, fuel | skein `docs/VM.md`, `kernel-zig/README.md` |
 | chat between instances, the infer protocol, the turn stream | skein `docs/MESSAGES.md` |
+| the shell app and the chat app | skein `docs/APPS.md` §6b |
 | apps, manifests, install | skein `docs/APPS.md` |
 
 ## Versions
 
 | | |
 |---|---|
-| this app | 0.2.0 (tag `v0.2.0`) |
+| this app | 0.1.0 (tag `v0.1.0`) |
 | skein-sdk | v0.4.0, by tag tarball and hash in `build.zig.zon` |
-| skein | pins the built modules by raw CID; `wasm/WORKBENCH` names the commit they came from |
 
-0.2.0 is the manifest in the dispatch-row shape (shruggr/skein#77, #79);
-the admin operations it once carried as programs are the kernel's own.
+0.1.0 is the split of shruggr/skein-workbench (archived) into this app and
+shruggr/skein-shell (shruggr/skein#83). The history of the loop is this
+repository's.
 
 ## Contributing
 

@@ -1,8 +1,8 @@
 .{
-    .name = .skein_workbench,
-    .version = "0.2.0",
+    .name = .skein_chat,
+    .version = "0.1.0",
     .minimum_zig_version = "0.16.0",
-    .fingerprint = 0xcbba6e71f0e93324,
+    .fingerprint = 0x6a83f5fb3bef4d1f,
     .dependencies = .{
         .skein_sdk = .{
             .url = "https://github.com/shruggr/skein-sdk/archive/refs/tags/v0.4.0.tar.gz",
@@ -13,8 +13,6 @@
         "build.zig",
         "build.zig.zon",
         "programs",
-        "scripts",
-        "toolset",
         "bin",
         "etc",
         "README.md",

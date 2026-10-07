@@ -1,7 +1,7 @@
 {
   "kind": "app",
   "name": "chat",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "programs": {
     "loop": "bin/loop.wasm"
   },
@@ -27,17 +27,11 @@
     }
   ],
   "requires": [],
-  "dispatch": [
+  "routes": [
     {
       "address": "chat",
-      "sender": "$owner",
-      "program": "loop"
-    },
-    {
-      "address": "chat",
-      "sender": "*",
-      "program": "loop"
+      "handler": "loop.chat"
     }
   ],
-  "description": "The chat loop: `chat` opens or continues a conversation — its prompt from the tree's SOUL.md, each turn kept, the `infer` peer asked, `bash` tool calls run in the shell app's shell (head shell/app; without the shell app a bash call answers exit 127) and `message` tool calls sent as a `chat` to another party — and answers the opener with a `chat` reply. From the owner, and from anyone (another agent's `message`); remove the open row with `skein-host dispatch` to take chats from the owner only."
+  "description": "The chat loop: `chat` opens or continues a conversation — its prompt from the tree's SOUL.md, each turn kept, the `infer` peer asked, `bash` tool calls run in the shell app's shell (head shell/app; without the shell app a bash call answers exit 127) and `message` tool calls sent as a `chat` to another party — and answers the opener with a `chat` reply. From anyone (another agent's `message`, root): `chat` is open — no role gates it (shruggr/skein#143); root narrows it by a role, a grant or a filter."
 }

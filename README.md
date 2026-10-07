@@ -9,7 +9,7 @@ an instance chats once this app is installed (shruggr/skein#83).
 
 | box | program | what |
 |---|---|---|
-| `chat` | `loop` | the turn loop: its prompt from the tree's `SOUL.md`; asks the `infer` peer; runs `bash` tool calls in the shell and `message` tool calls as a `chat` to another party; answers the opener with a `chat` reply. From the owner, and from anyone (another agent's `message`) |
+| `chat` | `loop` | the turn loop: its prompt from the tree's `SOUL.md`; asks the `infer` peer; runs `bash` tool calls in the shell and `message` tool calls as a `chat` to another party; answers the opener with a `chat` reply. From anyone: root, and another agent's `message` (an open route) |
 
 `bash` runs in the shell app's shell (shruggr/skein-shell): the loop reads
 the app record at the head `shell/app` and launches its `shell` program.
@@ -49,16 +49,15 @@ The manifest, `etc/app.json` (description left out):
       "answer": { "text": "string", "tree": "cid", "thread": "cid" } } } }
   ],
   "requires": [],
-  "dispatch": [
-    { "address": "chat", "sender": "$owner", "program": "loop" },
-    { "address": "chat", "sender": "*", "program": "loop" }
+  "routes": [
+    { "address": "chat", "handler": "loop.chat" }
   ]
 }
 ```
 
-The open row (`*`) lets other agents start a conversation; an owner who
-wants chats from the owner only removes it (`skein-host dispatch <handle>
-remove chat <loop>`) and keeps the owner's row.
+The route is open (shruggr/skein#143: no role gates `chat`), so other
+agents can start a conversation; to take chats from root only, gate it
+(`"roles": {"root": ["chat"]}`).
 
 ## Build and test
 
